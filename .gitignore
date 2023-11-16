@@ -1,0 +1,12 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Data Files
+data/
+
+# Model Files
+models/
+
+# Output Files
+out/
+
