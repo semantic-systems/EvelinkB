@@ -70,13 +70,13 @@ def EvaluateBLINK(in_args):
 		"test_mentions": None,
 		"interactive": False,
 		"top_k": in_args.topk,
-		"biencoder_model": "models/biencoder/epoch_5/pytorch_model.bin",
-		"biencoder_config": "models/biencoder/params.json",
+		"biencoder_model": "models/biencoder/epoch_9/pytorch_model.bin",
+		"biencoder_config": "models/biencoder/training_params.json",
 		"entity_catalogue": "models/entity.jsonl",
 		"entity_encoding": "models/all_entities.encoding",
 		"candidate_pool": "models/cand_pool.t7",
 		"crossencoder_model": "models/crossencoder/epoch_8/pytorch_model.bin",
-		"crossencoder_config": "models/crossencoder/params.json",
+		"crossencoder_config": "models/crossencoder/training_params.json",
 		"fast": in_args.fast,  # set this to be true if speed is a concern
 		"output_path": "out/",  # logging directory
 		"mode": in_args.mode,
