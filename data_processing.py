@@ -9,12 +9,14 @@ def GetSubeventMention(data_sentence, tagger):
     # predict NER tags
     tagger.predict(sentence)
     # print predicted NER spans
-    print('The following events are found:')
+    # print('The following events are found:')
     # iterate over entities and print
     for entity in sentence.get_spans('ner'):
         if entity.tag == "EVENT" and entity.score > 0.5:
             all_events.append(entity.text)
-    return all_events
+    # removing duplicates
+    all_events_unique = list(set(all_events))
+    return all_events_unique
 
 
 def GenerateBlinkData(infile_path, outfile_path):
@@ -40,27 +42,28 @@ def GenerateBlinkData(infile_path, outfile_path):
     json_list = []
 
     for event in clusters:
+        event_form = event
+        if event[0] == "'" and event[-1] == "'":
+            event_form = event[1:-1]
+
+        hyperlinks = []
+        for idx, title in enumerate(t2h[id2title[1][event_form]]):
+            if idx > 10:
+                break
+            link = t2h[id2title[1][event_form]][title]
+            if link['end'] > 2000:
+                continue
+            hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
+
+        sub_event = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+
         for mention in clusters[event]:
-            event_form = event
-            if event[0] == "'" and event[-1] == "'":
-                event_form = event[1:-1]
             page = title_text[mention['page']]
             entities = []
             for idx, entity in enumerate(mention['entities']):
                 form = title_text[mention['page']][entity['start']:entity['end']].lower()
                 entity['form'] = form
                 entities.append(entity)
-
-            hyperlinks = []
-            for idx, title in enumerate(t2h[id2title[1][event_form]]):
-                if idx > 10:
-                    break
-                link = t2h[id2title[1][event_form]][title]
-                if link['end'] > 2000:
-                    continue
-                hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
-
-            sub_event = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
 
             json_list.append({
                 "context_left": page[0: mention['start']],
