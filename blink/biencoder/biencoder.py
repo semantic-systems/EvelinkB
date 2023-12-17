@@ -11,10 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from pytorch_transformers.modeling_bert import (
-    BertPreTrainedModel,
-    BertConfig,
-    BertModel,
+from pytorch_transformers.modeling_distilbert import (
+    DistilBertPreTrainedModel,
+    DistilBertConfig,
+    DistilBertModel,
 )
 
 from pytorch_transformers.tokenization_bert import BertTokenizer
@@ -32,8 +32,8 @@ def load_biencoder(params):
 class BiEncoderModule(torch.nn.Module):
     def __init__(self, params):
         super(BiEncoderModule, self).__init__()
-        ctxt_bert = BertModel.from_pretrained(params["bert_model"])
-        cand_bert = BertModel.from_pretrained(params['bert_model'])
+        ctxt_bert = DistilBertModel.from_pretrained(params["bert_model"])
+        cand_bert = DistilBertModel.from_pretrained(params['bert_model'])
         self.context_encoder = BertEncoder(
             ctxt_bert,
             params["out_dim"],
