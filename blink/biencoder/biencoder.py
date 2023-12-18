@@ -32,8 +32,8 @@ def load_biencoder(params):
 class BiEncoderModule(torch.nn.Module):
     def __init__(self, params):
         super(BiEncoderModule, self).__init__()
-        ctxt_bert = DistilBertModel.from_pretrained(params["bert_model"])
-        cand_bert = DistilBertModel.from_pretrained(params['bert_model'])
+        ctxt_bert = BertModel.from_pretrained(params["bert_model"])
+        cand_bert = BertModel.from_pretrained(params['bert_model'])
         self.context_encoder = BertEncoder(
             ctxt_bert,
             params["out_dim"],
@@ -82,7 +82,7 @@ class BiEncoderRanker(torch.nn.Module):
         self.NULL_IDX = 0
         self.START_TOKEN = "[CLS]"
         self.END_TOKEN = "[SEP]"
-        self.tokenizer = DistilBertTokenizer.from_pretrained(
+        self.tokenizer = BertTokenizer.from_pretrained(
             params["bert_model"], do_lower_case=params["lowercase"]
         )
         # init model
