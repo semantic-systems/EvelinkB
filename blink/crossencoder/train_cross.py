@@ -181,7 +181,7 @@ def main(params):
 
     # An effective batch size of `x`, when we are accumulating the gradient accross `y` batches will be achieved by having a batch size of `z = x / y`
     # args.gradient_accumulation_steps = args.gradient_accumulation_steps // n_gpu
-    ["train_batch_size"] = (
+    params["train_batch_size"] = (
         params["train_batch_size"] // params["gradient_accumulation_steps"]
     )
     train_batch_size = params["train_batch_size"]
@@ -254,15 +254,15 @@ def main(params):
     )
 
     # evaluate before training
-    # results = evaluate(
-    #     reranker,
-    #     valid_dataloader,
-    #     device=device,
-    #     logger=logger,
-    #     context_length=context_length,
-    #     zeshel=params["zeshel"],
-    #     silent=params["silent"],
-    # )
+    results = evaluate(
+        reranker,
+        valid_dataloader,
+        device=device,
+        logger=logger,
+        context_length=context_length,
+        zeshel=params["zeshel"],
+        silent=params["silent"],
+    )
 
     number_of_samples_per_dataset = {}
 
@@ -282,8 +282,6 @@ def main(params):
     optimizer = get_optimizer(model, params)
     scheduler = get_scheduler(params, optimizer, len(train_tensor_data), logger)
 
-
-
     model.train()
 
     best_epoch_idx = -1
@@ -295,21 +293,23 @@ def main(params):
         tr_loss = 0
         results = None
 
-        time.sleep(10)
-        torch.cuda.empty_cache()
-        time.sleep(10)
-
         if params["silent"]:
             iter_ = train_dataloader
         else:
             iter_ = tqdm(train_dataloader, desc="Batch")
 
         part = 0
+
+        print("sleeping")
+        time.sleep(10)
+        torch.cuda.empty_cache()
+        time.sleep(5)
+        print("Cache emptied")
+
         for step, batch in enumerate(iter_):
             batch = tuple(t.to(device) for t in batch)
             context_input = batch[0] 
             label_input = batch[1]
-
             loss, _ = reranker(context_input, label_input, context_length)
 
             # if n_gpu > 1:
