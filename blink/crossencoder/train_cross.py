@@ -181,7 +181,7 @@ def main(params):
 
     # An effective batch size of `x`, when we are accumulating the gradient accross `y` batches will be achieved by having a batch size of `z = x / y`
     # args.gradient_accumulation_steps = args.gradient_accumulation_steps // n_gpu
-    git s["train_batch_size"] = (
+    ["train_batch_size"] = (
         params["train_batch_size"] // params["gradient_accumulation_steps"]
     )
     train_batch_size = params["train_batch_size"]
