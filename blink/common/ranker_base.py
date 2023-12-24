@@ -11,9 +11,10 @@ def get_model_obj(model):
     model = model.module if hasattr(model, "module") else model
     return model
 
+
 class BertEncoder(nn.Module):
     def __init__(
-        self, bert_model, output_dim, layer_pulled=-1, add_linear=None):
+            self, bert_model, output_dim, layer_pulled=-1, add_linear=None):
         super(BertEncoder, self).__init__()
         self.layer_pulled = layer_pulled
         bert_output_dim = bert_model.embeddings.word_embeddings.weight.size(1)
@@ -26,6 +27,8 @@ class BertEncoder(nn.Module):
             self.additional_linear = None
 
     def forward(self, token_ids, segment_ids, attention_mask):
+        print("Ranker Base")
+        print(token_ids.size(), segment_ids.size(), attention_mask.size())
         output_bert, output_pooler = self.bert_model(
             token_ids, segment_ids, attention_mask
         )
@@ -42,4 +45,3 @@ class BertEncoder(nn.Module):
             result = embeddings
 
         return result
-
