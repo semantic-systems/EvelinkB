@@ -27,8 +27,6 @@ class BertEncoder(nn.Module):
             self.additional_linear = None
 
     def forward(self, token_ids, segment_ids, attention_mask):
-        print("Ranker Base")
-        print(token_ids.size(), segment_ids.size(), attention_mask.size())
         output_bert, output_pooler = self.bert_model(
             token_ids, segment_ids, attention_mask
         )
