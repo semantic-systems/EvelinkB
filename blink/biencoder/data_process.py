@@ -24,13 +24,13 @@ def select_field(data, key1, key2=None):
 
 
 def get_context_representation(
-    sample,
-    tokenizer,
-    max_seq_length,
-    mention_key="mention",
-    context_key="context",
-    ent_start_token=ENT_START_TAG,
-    ent_end_token=ENT_END_TAG,
+        sample,
+        tokenizer,
+        max_seq_length,
+        mention_key="mention",
+        context_key="context",
+        ent_start_token=ENT_START_TAG,
+        ent_end_token=ENT_END_TAG,
 ):
     mention_tokens = []
     if sample[mention_key] and len(sample[mention_key]) > 0:
@@ -69,7 +69,7 @@ def get_context_representation(
             left_quota += right_quota - right_add
 
     context_tokens = (
-        context_left[-left_quota:] + mention_tokens + context_right[:right_quota]
+            context_left[-left_quota:] + mention_tokens + context_right[:right_quota]
     )
 
     context_tokens = ["[CLS]"] + context_tokens + entity_tokens + ["[SEP]"]
@@ -98,14 +98,14 @@ def get_context_representation(
 
 
 def get_candidate_representation(
-    candidate_desc, 
-    tokenizer, 
-    max_seq_length, 
-    candidate_title=None,
-    title_tag=ENT_TITLE_TAG,
-    hyperlinks=None
+        candidate_desc,
+        tokenizer,
+        max_seq_length,
+        sub_events,
+        candidate_title=None,
+        title_tag=ENT_TITLE_TAG,
+        hyperlinks=None
 ):
-
     cls_token = tokenizer.cls_token
     sep_token = tokenizer.sep_token
     cand_tokens = tokenizer.tokenize(candidate_desc)
@@ -124,11 +124,21 @@ def get_candidate_representation(
             link_tokens += tokens
 
     # print(link_tokens)
+    sub_events_tokens = []
+    print("Sub Events")
+    print(len(sub_events))
+    print(sub_events)
+    if sub_events:
+        for sub_event in sub_events:
+            tokens = tokenizer.tokenize[sub_event]
+            tokens = ["[SEP]"] + tokens
+            sub_events_tokens += tokens
+    print("Sub Event Token: ", sub_events_tokens)
 
-    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(link_tokens) - 2]
-    cand_tokens = [cls_token] + title_tokens + cand_tokens + link_tokens + [sep_token]
+    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(link_tokens) - len(sub_events_tokens) - 2]
+    cand_tokens = [cls_token] + title_tokens + cand_tokens + link_tokens + sub_events_tokens + [sep_token]
 
-    # print(cand_tokens)
+    print("Cand Token: ", cand_tokens)
 
     input_ids = tokenizer.convert_tokens_to_ids(cand_tokens)
     padding = [0] * (max_seq_length - len(input_ids))
@@ -147,20 +157,21 @@ def get_candidate_representation(
 
 
 def process_mention_data(
-    samples,
-    tokenizer,
-    max_context_length,
-    max_cand_length,
-    silent,
-    mention_key="mention",
-    context_key="context",
-    label_key="label",
-    title_key='label_title',
-    ent_start_token=ENT_START_TAG,
-    ent_end_token=ENT_END_TAG,
-    title_token=ENT_TITLE_TAG,
-    debug=False,
-    logger=None,
+        samples,
+        tokenizer,
+        max_context_length,
+        max_cand_length,
+        silent,
+        mention_key="mention",
+        context_key="context",
+        label_key="label",
+        title_key='label_title',
+        sub_event_key='sub_events',
+        ent_start_token=ENT_START_TAG,
+        ent_end_token=ENT_END_TAG,
+        title_token=ENT_TITLE_TAG,
+        debug=False,
+        logger=None,
 ):
     processed_samples = []
 
@@ -187,13 +198,14 @@ def process_mention_data(
 
         label = sample[label_key]
         title = sample.get(title_key, None)
+        sub_events = sample[sub_event_key]
         if 'hyperlinks' in sample:
             label_tokens = get_candidate_representation(
-                label, tokenizer, max_cand_length, title, hyperlinks=sample['hyperlinks']
+                label, tokenizer, max_cand_length, sub_events, title, hyperlinks=sample['hyperlinks']
             )
         else:
             label_tokens = get_candidate_representation(
-                label, tokenizer, max_cand_length, title
+                label, tokenizer, max_cand_length, sub_events, title
             )
         label_idx = int(sample["label_id"])
 
