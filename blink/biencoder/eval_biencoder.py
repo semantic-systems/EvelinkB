@@ -97,8 +97,8 @@ def load_entity_dict(logger, params, is_zeshel):
                     hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
 
             text = title_text[event].strip()
-            sub_event = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
-            entity_list.append((event, text[0:2000], hyperlinks, sub_event))
+            sub_events = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+            entity_list.append((event, text[0:2000], hyperlinks, sub_events))
             if params["debug"] and len(entity_list) > 200000:
                 break
 
@@ -166,8 +166,8 @@ def get_candidate_pool_tensor(
             title = None
             entity_text = entity_desc
 
-        print("Sub_events")
-        print(sub_events)
+        # print("Sub_events")
+        # print(sub_events)
         rep = data.get_candidate_representation(
             entity_text,
             tokenizer,
@@ -250,6 +250,7 @@ def load_or_generate_candidate_pool(
     if candidate_pool is None:
         # compute candidate pool from entity list
         entity_desc_list = load_entity_dict(logger, params, is_zeshel)
+
         candidate_pool = get_candidate_pool_tensor_helper(
             entity_desc_list,
             tokenizer,
