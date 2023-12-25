@@ -22,8 +22,41 @@ import blink.biencoder.nn_prediction as nnquery
 import blink.candidate_ranking.utils as utils
 from blink.biencoder.zeshel_utils import WORLDS, load_entity_dict_zeshel, Stats
 from blink.common.params import BlinkParser
+from flair.data import Sentence
+from flair.models import SequenceTagger
 
 import pickle
+
+
+def GetSubeventMention(data_sentence, tagger):
+    all_events = []
+    if len(data_sentence) < 25000:
+        sentence = Sentence(data_sentence)
+        # predict NER tags
+        tagger.predict(sentence)
+        # print predicted NER spans
+        # print('The following events are found:
+        # iterate over entities and print
+        for entity in sentence.get_spans('ner'):
+            if entity.tag == "EVENT" and entity.score > 0.5:
+                all_events.append(entity.text)
+    else:
+        chunks, chunk_size = len(data_sentence), len(data_sentence) // 6
+        sub_sentences = [data_sentence[i:i + chunk_size] for i in range(0, chunks, chunk_size)]
+        for s in sub_sentences:
+            sentence = Sentence(s)
+            # predict NER tags
+            tagger.predict(sentence)
+            # print predicted NER spans
+            # print('The following events are found:
+            # iterate over entities and print
+            for entity in sentence.get_spans('ner'):
+                if entity.tag == "EVENT" and entity.score > 0.5:
+                    all_events.append(entity.text)
+
+    # removing duplicates
+    all_events_unique = list(set(all_events))
+    return all_events_unique
 
 
 def load_entity_dict(logger, params, is_zeshel):
@@ -46,6 +79,9 @@ def load_entity_dict(logger, params, is_zeshel):
         t2hyperlinks_file = open('data/wikipedia/wiki/t2hyperlinks.json', 'r')
         t2h = json.load(t2hyperlinks_file)
 
+        tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
+        print('Sequence Tagger loaded.')
+
         for event in title_text:
             event_form = event
             if event[0] == "'" and event[-1] == "'":
@@ -61,7 +97,8 @@ def load_entity_dict(logger, params, is_zeshel):
                     hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
 
             text = title_text[event].strip()
-            entity_list.append((event, text[0:2000], hyperlinks))
+            sub_event = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+            entity_list.append((event, text[0:2000], hyperlinks, sub_event))
             if params["debug"] and len(entity_list) > 200000:
                 break
 
@@ -70,10 +107,10 @@ def load_entity_dict(logger, params, is_zeshel):
 
 # zeshel version of get candidate_pool_tensor
 def get_candidate_pool_tensor_zeshel(
-    entity_dict,
-    tokenizer,
-    max_seq_length,
-    logger,
+        entity_dict,
+        tokenizer,
+        max_seq_length,
+        logger,
 ):
     candidate_pool = {}
     for src in range(len(WORLDS)):
@@ -91,11 +128,11 @@ def get_candidate_pool_tensor_zeshel(
 
 
 def get_candidate_pool_tensor_helper(
-    entity_desc_list,
-    tokenizer,
-    max_seq_length,
-    logger,
-    is_zeshel,
+        entity_desc_list,
+        tokenizer,
+        max_seq_length,
+        logger,
+        is_zeshel,
 ):
     if is_zeshel:
         return get_candidate_pool_tensor_zeshel(
@@ -114,41 +151,44 @@ def get_candidate_pool_tensor_helper(
 
 
 def get_candidate_pool_tensor(
-    entity_desc_list,
-    tokenizer,
-    max_seq_length,
-    logger,
+        entity_desc_list,
+        tokenizer,
+        max_seq_length,
+        logger,
 ):
     # TODO: add multiple thread process
     logger.info("Convert candidate text to id")
-    cand_pool = [] 
+    cand_pool = []
     for entity_desc in tqdm(entity_desc_list):
         if type(entity_desc) is tuple:
-            title, entity_text, hyperlinks = entity_desc
+            title, entity_text, hyperlinks, sub_events = entity_desc
         else:
             title = None
             entity_text = entity_desc
 
+        print("Sub_events")
+        print(sub_events)
         rep = data.get_candidate_representation(
-                entity_text, 
-                tokenizer, 
-                max_seq_length,
-                title,
-                hyperlinks=hyperlinks
+            entity_text,
+            tokenizer,
+            max_seq_length,
+            sub_events,
+            title,
+            hyperlinks=hyperlinks
         )
         cand_pool.append(rep["ids"])
 
-    cand_pool = torch.LongTensor(cand_pool) 
+    cand_pool = torch.LongTensor(cand_pool)
     return cand_pool
 
 
 def encode_candidate(
-    reranker,
-    candidate_pool,
-    encode_batch_size,
-    silent,
-    logger,
-    is_zeshel,
+        reranker,
+        candidate_pool,
+        encode_batch_size,
+        silent,
+        logger,
+        is_zeshel,
 ):
     if is_zeshel:
         src = 0
@@ -165,7 +205,7 @@ def encode_candidate(
             )
             cand_encode_dict[src] = cand_pool_encode
         return cand_encode_dict
-        
+
     reranker.model.eval()
     device = reranker.device
     sampler = SequentialSampler(candidate_pool)
@@ -191,10 +231,10 @@ def encode_candidate(
 
 
 def load_or_generate_candidate_pool(
-    tokenizer,
-    params,
-    logger,
-    cand_pool_path,
+        tokenizer,
+        params,
+        logger,
+        cand_pool_path,
 ):
     candidate_pool = None
     is_zeshel = params.get("zeshel", None)
@@ -234,7 +274,7 @@ def main(params):
     reranker = BiEncoderRanker(params)
     tokenizer = reranker.tokenizer
     model = reranker.model
-    
+
     device = reranker.device
 
     cand_encode_path = params.get("cand_encode_path", None)
@@ -268,7 +308,7 @@ def main(params):
             silent=params["silent"],
             logger=logger,
             is_zeshel=params.get("zeshel", None)
-            
+
         )
 
         # if cand_encode_path is not None:
