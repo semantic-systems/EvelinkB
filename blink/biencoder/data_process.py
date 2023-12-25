@@ -130,7 +130,7 @@ def get_candidate_representation(
     print(sub_events)
     if sub_events:
         for sub_event in sub_events:
-            tokens = tokenizer.tokenize[sub_event]
+            tokens = tokenizer.tokenize(sub_event)
             tokens = ["[SEP]"] + tokens
             sub_events_tokens += tokens
     print("Sub Event Token: ", sub_events_tokens)
