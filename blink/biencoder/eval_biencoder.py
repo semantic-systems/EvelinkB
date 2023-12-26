@@ -30,16 +30,19 @@ import pickle
 
 def GetSubeventMention(data_sentence, tagger):
     all_events = []
-    if len(data_sentence) < 25000:
-        sentence = Sentence(data_sentence)
-        # predict NER tags
-        tagger.predict(sentence)
-        # print predicted NER spans
-        # print('The following events are found:
-        # iterate over entities and print
-        for entity in sentence.get_spans('ner'):
-            if entity.tag == "EVENT" and entity.score > 0.5:
-                all_events.append(entity.text)
+    if 25000 > len(data_sentence) > 100:
+        try:
+            sentence = Sentence(data_sentence)
+            # predict NER tags
+            tagger.predict(sentence)
+            # print predicted NER spans
+            # print('The following events are found:
+            # iterate over entities and print
+            for entity in sentence.get_spans('ner'):
+                if entity.tag == "EVENT" and entity.score > 0.5:
+                    all_events.append(entity.text)
+        except:
+            print("Data Sentence: ", data_sentence)
     else:
         chunks, chunk_size = len(data_sentence), len(data_sentence) // 6
         sub_sentences = [data_sentence[i:i + chunk_size] for i in range(0, chunks, chunk_size)]
