@@ -47,15 +47,18 @@ def GetSubeventMention(data_sentence, tagger):
         chunks, chunk_size = len(data_sentence), len(data_sentence) // 6
         sub_sentences = [data_sentence[i:i + chunk_size] for i in range(0, chunks, chunk_size)]
         for s in sub_sentences:
-            sentence = Sentence(s)
-            # predict NER tags
-            tagger.predict(sentence)
-            # print predicted NER spans
-            # print('The following events are found:
-            # iterate over entities and print
-            for entity in sentence.get_spans('ner'):
-                if entity.tag == "EVENT" and entity.score > 0.5:
-                    all_events.append(entity.text)
+            try:
+                sentence = Sentence(s)
+                # predict NER tags
+                tagger.predict(sentence)
+                # print predicted NER spans
+                # print('The following events are found:
+                # iterate over entities and print
+                for entity in sentence.get_spans('ner'):
+                    if entity.tag == "EVENT" and entity.score > 0.5:
+                        all_events.append(entity.text)
+            except:
+                print("Sub Sentence: ", s)
 
     # removing duplicates
     all_events_unique = list(set(all_events))
