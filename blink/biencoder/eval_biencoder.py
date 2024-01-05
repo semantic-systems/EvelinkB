@@ -93,6 +93,7 @@ def load_entity_dict(logger, params, is_zeshel):
             if event[0] == "'" and event[-1] == "'":
                 event_form = event[1:-1]
             hyperlinks = []
+            sub_events = []
             if event_form.replace(" ", '_') in id2title[1] and id2title[1][event_form.replace(" ", '_')] in t2h:
                 for idx, title in enumerate(t2h[id2title[1][event_form.replace(" ", '_')]]):
                     if idx > 10:
@@ -103,7 +104,10 @@ def load_entity_dict(logger, params, is_zeshel):
                     hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
 
             text = title_text[event].strip()
-            sub_events = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+            try:
+                sub_events = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+            except:
+                print(f"Event Form {event_form.replace('_', ' ')}")
             entity_list.append((event, text[0:2000], hyperlinks, sub_events))
             if params["debug"] and len(entity_list) > 200000:
                 break
