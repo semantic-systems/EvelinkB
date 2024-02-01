@@ -35,10 +35,10 @@ import blink.biencoder.data_process as data
 from blink.biencoder.zeshel_utils import DOC_PATH, WORLDS, world_to_id
 from blink.common.optimizer import get_bert_optimizer
 from blink.common.params import BlinkParser
+import blink.crossencoder.convert_topk_tensor_1 as data
 
 
 logger = None
-
 
 def modify(context_input, candidate_input, max_seq_length):
     new_input = []

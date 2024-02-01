@@ -70,7 +70,7 @@ def EvaluateBLINK(in_args):
 		"test_mentions": None,
 		"interactive": False,
 		"top_k": in_args.topk,
-		"biencoder_model": "models/biencoder/epoch_9/pytorch_model.bin",
+		"biencoder_model": "models/biencoder/epoch_6/pytorch_model.bin",
 		"biencoder_config": "models/biencoder/training_params.json",
 		"entity_catalogue": "models/entity.jsonl",
 		"entity_encoding": "models/all_entities.encoding",
@@ -122,6 +122,18 @@ def EvaluateBLINK(in_args):
 
 		outfile = open(args.output_path + '{}_result_top{}.json'.format(args.mode, args.top_k), 'w')
 		json.dump(clusters, outfile)
+
+		if args.mode == 'train' or args.mode == 'valid':
+			print("Data Processing For Cross-Encoder")
+			print("Data Points: ", len(data_to_link)," Predictions: ", len(predictions))
+			for idx, data in enumerate(data_to_link):
+				data['edl'] = predictions[idx]
+				data['scores'] = np.array(scores[idx]).tolist()
+
+			with open(args.output_path + '{}_result_dp_top{}.json'.format(args.mode, args.top_k), 'w') as outfile:
+				for entry in data_to_link:
+					json.dump(entry, outfile)
+					outfile.write('\n')
 
 
 def WikiAccuracy(args, is_recall=False):

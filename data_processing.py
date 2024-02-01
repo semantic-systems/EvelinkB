@@ -1,11 +1,50 @@
 import json, pickle
 from flair.data import Sentence
 from flair.models import SequenceTagger
+from cosine import get_cosine_result
+import wikipediaapi
+import time
+import traceback
+import logging
 
+wiki_wiki = wikipediaapi.Wikipedia('EvelinkB (evelinkb@gmail.com)', 'en')
+
+def get_hyperlink_with_type(hyperlink, ner_tagger):
+    entity_tag = None
+    wp = wiki_wiki.page(hyperlink.replace("_",' ').replace("'",'').strip('\"'))
+    if wp is not None:
+        if wp.summary != "" or wp.summary is not None:
+            # print("summary",wp.summary)
+            sentence = Sentence(wp.summary)
+            ner_tagger.predict(sentence)
+
+            # iterate over entities and print
+            for entity in sentence.get_spans('ner'):
+                if get_cosine_result(entity.text, hyperlink.replace("_",' ')) > 0.3 and entity.score > 0.5:
+                    # print(entity.text," ------ ", hyperlink.replace("_", ' '))
+                    # print("Cosine Result", get_cosine_result(entity.text, hyperlink.replace("_", ' ')))
+                    entity_tag = entity.tag
+                    break
+        else:
+            print("No Summary found for hyperlink " + hyperlink)
+            if wp.content != "" or wp.content is not None:
+                # print("summary",wp.summary)
+                sentence = Sentence(wp.content[:2000])
+                ner_tagger.predict(sentence)
+
+                # iterate over entities and print
+                for entity in sentence.get_spans('ner'):
+                    if get_cosine_result(entity.text, hyperlink.replace("_", ' ')) > 0.3 and entity.score > 0.5:
+                        # print(entity.text," ------ ", hyperlink.replace("_", ' '))
+                        # print("Cosine Result", get_cosine_result(entity.text, hyperlink.replace("_", ' ')))
+                        entity_tag = entity.tag
+                        break
+
+    return entity_tag
 
 def GetSubeventMention(data_sentence, tagger):
     all_events = []
-    if len(data_sentence) < 25000:
+    if 100 < len(data_sentence) < 25000:
         sentence = Sentence(data_sentence)
         # predict NER tags
         tagger.predict(sentence)
@@ -13,10 +52,10 @@ def GetSubeventMention(data_sentence, tagger):
         # print('The following events are found:
         # iterate over entities and print
         for entity in sentence.get_spans('ner'):
-            if entity.tag == "EVENT" and entity.score > 0.5:
+            if entity.tag == "EVENT" and entity.score > 0.7:
                 all_events.append(entity.text)
     else:
-        chunks, chunk_size = len(data_sentence), len(data_sentence) // 6
+        chunks, chunk_size = len(data_sentence), len(data_sentence) // 4
         sub_sentences = [data_sentence[i:i + chunk_size] for i in range(0, chunks, chunk_size)]
         for s in sub_sentences:
             sentence = Sentence(s)
@@ -26,7 +65,7 @@ def GetSubeventMention(data_sentence, tagger):
             # print('The following events are found:
             # iterate over entities and print
             for entity in sentence.get_spans('ner'):
-                if entity.tag == "EVENT" and entity.score > 0.5:
+                if entity.tag == "EVENT" and entity.score > 0.7:
                     all_events.append(entity.text)
 
     # removing duplicates
@@ -55,21 +94,31 @@ def GenerateBlinkData(infile_path, outfile_path):
 
     query_id = 0
     json_list = []
-
+    sleep_id = 0
     for event in clusters:
         event_form = event
         if event[0] == "'" and event[-1] == "'":
             event_form = event[1:-1]
 
         hyperlinks = []
+        hyperlink_type = None
         for idx, title in enumerate(t2h[id2title[1][event_form]]):
             if idx > 10:
                 break
             link = t2h[id2title[1][event_form]][title]
+            # print("Link", link)
             if link['end'] > 2000:
                 continue
-            hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
+            # print ("Hyperlink Title",title,"HyperLink appended", title_text[event_form.replace("_", ' ')][link['start']: link['end']])
+            try:
+                hyperlink_type = get_hyperlink_with_type(title,tagger)
+            except Exception as e:
+                print('No hyperlink Type found for title: ', title)
+                time.sleep(3)
+            hyperlinks.append([title, title_text[event_form.replace("_", ' ')][link['start']: link['end']], hyperlink_type])
 
+        sub_event = []
+        # print("Hyperlinks", hyperlinks)
         sub_event = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
 
         for mention in clusters[event]:
@@ -92,6 +141,11 @@ def GenerateBlinkData(infile_path, outfile_path):
                 "entities": entities
             })
             query_id += 1
+        sleep_id+=1
+
+        if sleep_id % 1000 == 0:
+            print("Sleeping for 10 seconds")
+            time.sleep(10)
 
     print(query_id)
 
@@ -102,6 +156,6 @@ def GenerateBlinkData(infile_path, outfile_path):
 
 
 if __name__ == '__main__':
-    GenerateBlinkData('data/wikipedia/preprocessed/wiki_valid.json', 'out/valid.jsonl')
-    GenerateBlinkData('data/wikipedia/preprocessed/wiki_test.json', 'out/test.jsonl')
-    GenerateBlinkData('data/wikipedia/preprocessed/wiki_train.json', 'out/train.jsonl')
+    # GenerateBlinkData('data/wikipedia/preprocessed/wiki_valid.json', 'out/hyp_valid.jsonl')
+    # GenerateBlinkData('data/wikipedia/preprocessed/wiki_test.json', 'out/hyp_test.jsonl')
+    GenerateBlinkData('data/wikipedia/preprocessed/wiki_train.json', 'out/hyp_train.jsonl')

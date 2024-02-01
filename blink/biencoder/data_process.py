@@ -73,7 +73,8 @@ def get_context_representation(
     )
 
     context_tokens = ["[CLS]"] + context_tokens + entity_tokens + ["[SEP]"]
-    # print(context_tokens)
+    # print("context tokens", context_tokens)
+    # print("entity tokens",entity_tokens)
     input_ids = tokenizer.convert_tokens_to_ids(context_tokens)
     padding = [0] * (max_seq_length - len(input_ids))
     input_ids += padding
@@ -125,12 +126,13 @@ def get_candidate_representation(
 
     # print(link_tokens)
     sub_events_tokens = []
-    # print("Sub Events")
-    # print(len(sub_events))
-    # print(sub_events)
+
+    # print(type(sub_events))
+    # print("Sub Events:", sub_events)
     if sub_events:
         if len(sub_events) > 10:
-            sub_events = sub_events[-10:]
+            sub_events = sub_events[0:10]
+            # print("reduce sub events",sub_events)
             for sub_event in sub_events:
                 tokens = tokenizer.tokenize(sub_event)
                 tokens = ["[SEP]"] + tokens
@@ -140,6 +142,8 @@ def get_candidate_representation(
                 tokens = tokenizer.tokenize(sub_event)
                 tokens = ["[SEP]"] + tokens
                 sub_events_tokens += tokens
+
+    # print("Link Tokens", link_tokens)
     # print("Sub Event Token: ", sub_events_tokens)
 
     cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(link_tokens) - len(sub_events_tokens) - 2]
