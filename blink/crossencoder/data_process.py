@@ -6,13 +6,78 @@
 #
 import torch
 import sys
-
+import re
+import dateutil.parser as dparser
 import numpy as np
+import wikipediaapi
+
 from tqdm import tqdm
 import blink.biencoder.data_process as data
 from blink.common.params import ENT_START_TAG, ENT_END_TAG
+from flair.data import Sentence
+from flair.models import SequenceTagger
+
+wiki_wiki = wikipediaapi.Wikipedia('EvelinkBFinal (evelinkb@gmail.com)', 'en')
+
+def GetDate(title: str):
+    if re.search('\d{2}th', title) or re.search('\d{2}nd', title):
+        return None
+    if re.search('no.\d{2}', title) or re.search(' \d{2} ', title):
+        return None
+    try:
+        year = dparser.parse(title, fuzzy=True).year
+        if 2024 > year > 1000:
+            return year
+    except:
+        return None
 
 
+def GetAllSections(sections, level=0):
+    section_titles = []
+    for s in sections:
+        # print("%s: %s" % ("*" * (level + 1), s.title))
+        section_titles.append(s.title)
+        section_titles.extend(GetAllSections(s.sections, level + 1))
+    return section_titles
+
+
+def GetSectionsFromWiki(title: str):
+    try:
+        wp = wiki_wiki.page(title)
+        sections = wp.sections
+        return sections
+    except:
+        return None
+
+def GetSubeventMention(data_sentence, tagger):
+    all_events = []
+    if 100 < len(data_sentence) < 25000:
+        sentence = Sentence(data_sentence)
+        # predict NER tags
+        tagger.predict(sentence)
+        # print predicted NER spans
+        # print('The following events are found:
+        # iterate over entities and print
+        for entity in sentence.get_spans('ner'):
+            if entity.tag == "EVENT" and entity.score > 0.7:
+                all_events.append(entity.text)
+    else:
+        chunks, chunk_size = len(data_sentence), len(data_sentence) // 4
+        sub_sentences = [data_sentence[i:i + chunk_size] for i in range(0, chunks, chunk_size)]
+        for s in sub_sentences:
+            sentence = Sentence(s)
+            # predict NER tags
+            tagger.predict(sentence)
+            # print predicted NER spans
+            # print('The following events are found:
+            # iterate over entities and print
+            for entity in sentence.get_spans('ner'):
+                if entity.tag == "EVENT" and entity.score > 0.7:
+                    all_events.append(entity.text)
+
+    # removing duplicates
+    all_events_unique = list(set(all_events))
+    return all_events_unique
 
 def prepare_crossencoder_mentions(
     tokenizer,
@@ -46,6 +111,8 @@ def prepare_crossencoder_mentions(
 def prepare_crossencoder_candidates(
     tokenizer, labels, nns, id2title, id2text, id2hyper, max_cand_length=256, topk=200
 ):
+    # tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
+    # print('Sequence Tagger loaded.')
 
     START_TOKEN = tokenizer.cls_token
     END_TOKEN = tokenizer.sep_token
@@ -62,21 +129,46 @@ def prepare_crossencoder_candidates(
             if label == candidate_id:
                 label_id = jdx
             # print(id2text.keys())
+            sub_event = []
+            # try:
+            #     sub_event = GetSubeventMention(id2text[candidate_id], tagger)
+            # except Exception as e:
+            #     print("No sub events for Candidate id: ", candidate_id, "Candidate title: ", id2title[candidate_id])
+            #
+            # year = GetDate(id2title[candidate_id].replace("_", ' ').replace("'", '').strip('\"'))
+            year = None
+
+            # sections = GetSectionsFromWiki(id2title[candidate_id].replace("_", ' '))
+            # all_sections = []
+            # if sections is not None:
+            #     all_sections = GetAllSections(sections)
+
+            overlap_sections = []
+            # for item in sub_event:
+            #     if item in all_sections:
+            #         overlap_sections.append(item)
+
             if candidate_id in id2hyper:
                 rep = data.get_candidate_representation(
                     id2text[candidate_id],
                     tokenizer,
                     max_cand_length,
-                    id2title[candidate_id],
-                    hyperlinks=id2hyper[candidate_id]
+                    overlap_sections,
+                    sub_event,
+                    candidate_title=id2title[candidate_id],
+                    hyperlinks=id2hyper[candidate_id],
+                    year=year
                 )
             else:
                 rep = data.get_candidate_representation(
                     id2text[candidate_id],
                     tokenizer,
                     max_cand_length,
-                    id2title[candidate_id],
-                    hyperlinks=None
+                    overlap_sections,
+                    sub_event,
+                    candidate_title=id2title[candidate_id],
+                    hyperlinks=None,
+                    year=year
                 )
             tokens_ids = rep["ids"]
             assert len(tokens_ids) == max_cand_length

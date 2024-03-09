@@ -85,15 +85,15 @@ def load_entity_dict(logger, params, is_zeshel):
         t2hyperlinks_file = open('data/wikipedia/wiki/t2hyperlinks.json', 'r')
         t2h = json.load(t2hyperlinks_file)
 
-        tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
-        print('Sequence Tagger loaded.')
+        # tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
+        # print('Sequence Tagger loaded.')
 
         for event in title_text:
             event_form = event
             if event[0] == "'" and event[-1] == "'":
                 event_form = event[1:-1]
             hyperlinks = []
-            sub_events = []
+            # sub_events = []
             if event_form.replace(" ", '_') in id2title[1] and id2title[1][event_form.replace(" ", '_')] in t2h:
                 for idx, title in enumerate(t2h[id2title[1][event_form.replace(" ", '_')]]):
                     if idx > 10:
@@ -104,11 +104,11 @@ def load_entity_dict(logger, params, is_zeshel):
                     hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
 
             text = title_text[event].strip()
-            try:
-                sub_events = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
-            except:
-                print(f"Event Form {event_form.replace('_', ' ')}")
-            entity_list.append((event, text[0:2000], hyperlinks, sub_events))
+            # try:
+            #     sub_events = GetSubeventMention(title_text[event_form.replace("_", ' ')], tagger)
+            # except:
+            #     print(f"Event Form {event_form.replace('_', ' ')}")
+            entity_list.append((event, text[0:2000], hyperlinks))
             if params["debug"] and len(entity_list) > 200000:
                 break
 
@@ -171,7 +171,7 @@ def get_candidate_pool_tensor(
     cand_pool = []
     for entity_desc in tqdm(entity_desc_list):
         if type(entity_desc) is tuple:
-            title, entity_text, hyperlinks, sub_events = entity_desc
+            title, entity_text, hyperlinks = entity_desc
         else:
             title = None
             entity_text = entity_desc
@@ -182,7 +182,7 @@ def get_candidate_pool_tensor(
             entity_text,
             tokenizer,
             max_seq_length,
-            sub_events,
+            None,
             title,
             hyperlinks=hyperlinks
         )

@@ -16,6 +16,7 @@ import datetime
 ENT_START_TAG = "[unused0]"
 ENT_END_TAG = "[unused1]"
 ENT_TITLE_TAG = "[unused2]"
+ENT_DATE_TAG = "[unused40]"
 
 TYPE_TAG_MAPPING = {
     "PER": ("[unused3]", "[unused4]"),

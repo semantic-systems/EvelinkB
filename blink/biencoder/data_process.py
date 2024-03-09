@@ -102,10 +102,13 @@ def get_candidate_representation(
         candidate_desc,
         tokenizer,
         max_seq_length,
+        overlap_sections,
         sub_events,
         candidate_title=None,
         title_tag=ENT_TITLE_TAG,
-        hyperlinks=None
+        year_tag=None,
+        hyperlinks=None,
+        year=None,
 ):
     cls_token = tokenizer.cls_token
     sep_token = tokenizer.sep_token
@@ -115,10 +118,17 @@ def get_candidate_representation(
         title_tokens = tokenizer.tokenize(candidate_title)
         title_tokens = title_tokens + [title_tag]
 
+    year_tokens = []
+    if year is not None:
+        # print("Year", year)
+        year_tokens = tokenizer.tokenize(str(year))
+        year_tokens = [TYPE_TAG_MAPPING['DATE'][0]] + year_tokens + [TYPE_TAG_MAPPING['DATE'][1]]
+
     link_tokens = []
     # print(hyperlinks)
 
     if hyperlinks is not None:
+        # print("Hyperlinks", hyperlinks)
         for link in hyperlinks:
             tokens = tokenizer.tokenize(link[1])
             tokens = ["[SEP]"] + tokens
@@ -129,9 +139,29 @@ def get_candidate_representation(
 
     # print(type(sub_events))
     # print("Sub Events:", sub_events)
-    if sub_events:
-        if len(sub_events) > 10:
-            sub_events = sub_events[0:10]
+    if overlap_sections:
+        # print("Overlap Sections:", overlap_sections)
+        if len(overlap_sections) > 6:
+            overlap_sections = overlap_sections[:6]
+            for section in overlap_sections:
+                tokens = tokenizer.tokenize(section)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+        else:
+            for section in overlap_sections:
+                tokens = tokenizer.tokenize(section)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+
+    # removing duplicates from sub_events
+    if len(sub_events) > 0 and len(overlap_sections) > 0:
+        _, sub_events = list(set(overlap_sections).difference(sub_events)), list(
+            set(sub_events).difference(overlap_sections))
+
+    if len(sub_events) > 0:
+        # print("Sub events:", sub_events)
+        if len(sub_events) + len(overlap_sections) > 12:
+            sub_events = sub_events[0: 12 - len(overlap_sections)]
             # print("reduce sub events",sub_events)
             for sub_event in sub_events:
                 tokens = tokenizer.tokenize(sub_event)
@@ -146,10 +176,12 @@ def get_candidate_representation(
     # print("Link Tokens", link_tokens)
     # print("Sub Event Token: ", sub_events_tokens)
 
-    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(link_tokens) - len(sub_events_tokens) - 2]
-    cand_tokens = [cls_token] + title_tokens + cand_tokens + link_tokens + sub_events_tokens + [sep_token]
+    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(year_tokens) - len(link_tokens) - len(
+        sub_events_tokens) - 2]
+    cand_tokens = [cls_token] + title_tokens + year_tokens + cand_tokens + link_tokens + sub_events_tokens + [sep_token]
 
-    # print("Cand Token: ", cand_tokens)
+    # if len(overlap_sections) > 0 and year is not None and sub_events is not None:
+    #     print("Cand Token: ", cand_tokens)
 
     input_ids = tokenizer.convert_tokens_to_ids(cand_tokens)
     padding = [0] * (max_seq_length - len(input_ids))

@@ -542,6 +542,23 @@ def run(
                     predictions,
                     scores,
                 )
+
+        bi_encoder_data = {
+        'samples': f"{samples}",
+        'candidate_vecs': f"{labels}",
+        'labels': f"{nns}"
+        }
+
+        try:
+            save_data_path = os.path.join(args.output_path, "test_bi_encoder_candidates.json")
+            outfile = open(save_data_path, 'w')
+            json.dump(bi_encoder_data, outfile)
+        except:
+            save_data_path = os.path.join(args.output_path, "test_bi_encoder_candidates.txt")
+            outfile = open(save_data_path, 'w')
+            outfile.write(f'{bi_encoder_data}')
+            outfile.close()
+
         # prepare crossencoder data
         context_input, candidate_input, label_input = prepare_crossencoder_data(
             crossencoder.tokenizer, samples, labels, nns, id2title, id2text, id2hyper, keep_all=True, args=crossencoder_params
@@ -550,6 +567,8 @@ def run(
             context_input, candidate_input, crossencoder_params["max_seq_length"]
         )
 
+        save_data_path = os.path.join(args.output_path, "test_cross_candidate.t7")
+        torch.save(context_input, save_data_path)
 
         dataloader = _process_crossencoder_dataloader(
             context_input, label_input, crossencoder_params

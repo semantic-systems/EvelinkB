@@ -18,6 +18,7 @@ import requests
 import dateutil.parser as dparser
 import re
 import wikipediaapi
+import ast
 
 from blink.biencoder.biencoder import BiEncoderRanker
 from pytorch_transformers.tokenization_bert import BertTokenizer
@@ -27,7 +28,7 @@ from blink.common.params import BlinkParser
 
 from blink.common.params import ENT_START_TAG, ENT_END_TAG, ENT_TITLE_TAG, TYPE_TAG_MAPPING, ENT_DATE_TAG
 
-wiki_wiki = wikipediaapi.Wikipedia('EvelinkB3 (evelinkb@gmail.com)', 'en')
+wiki_wiki = wikipediaapi.Wikipedia('EvelinkB1 (evelinkb@gmail.com)', 'en')
 
 
 def GetWikiID(id2title, title):
@@ -169,6 +170,7 @@ def get_candidate_representation(
 
     year_tokens = []
     if year is not None:
+        # print("Year", year)
         year_tokens = tokenizer.tokenize(str(year))
         year_tokens = [TYPE_TAG_MAPPING['DATE'][0]] + year_tokens + [TYPE_TAG_MAPPING['DATE'][1]]
 
@@ -176,6 +178,7 @@ def get_candidate_representation(
     # print(hyperlinks)
 
     if hyperlinks is not None:
+        # print("Hyperlinks", hyperlinks)
         for link in hyperlinks:
             tokens = tokenizer.tokenize(link[1])
             tokens = ["[SEP]"] + tokens
@@ -187,6 +190,7 @@ def get_candidate_representation(
     # print(type(sub_events))
     # print("Sub Events:", sub_events)
     if overlap_sections:
+        # print("Overlap Sections:", overlap_sections)
         if len(overlap_sections) > 6:
             overlap_sections = overlap_sections[:6]
             for section in overlap_sections:
@@ -201,10 +205,11 @@ def get_candidate_representation(
 
     # removing duplicates from sub_events
     if sub_events is not None and len(overlap_sections) > 0:
-        overlap_sections, sub_events = list(set(overlap_sections).difference(sub_events)), list(
+        _, sub_events = list(set(overlap_sections).difference(sub_events)), list(
             set(sub_events).difference(overlap_sections))
 
     if sub_events is not None:
+        # print("Sub events:", sub_events)
         if len(sub_events) + len(overlap_sections) > 12:
             sub_events = sub_events[0: 12 - len(overlap_sections)]
             # print("reduce sub events",sub_events)
@@ -225,7 +230,8 @@ def get_candidate_representation(
         sub_events_tokens) - 2]
     cand_tokens = [cls_token] + title_tokens + year_tokens + cand_tokens + link_tokens + sub_events_tokens + [sep_token]
 
-    # print("Cand Token: ", cand_tokens)
+    # if len(overlap_sections) > 0 and year is not None and sub_events is not None:
+    #     print("Cand Token: ", cand_tokens)
 
     input_ids = tokenizer.convert_tokens_to_ids(cand_tokens)
     padding = [0] * (max_seq_length - len(input_ids))
@@ -316,6 +322,15 @@ def getCandidateData(tagger, title: str, id2title: dict, t2h: dict, title_text: 
     return text[0:2000], sub_events, title, hyperlinks, year, overlap_sections
 
 
+def getCandidateDatafromBackup(candidate):
+    sub_events = ast.literal_eval(candidate['sub_events'])
+    hyperlinks = ast.literal_eval(candidate['hyperlinks'])
+    sections = ast.literal_eval(candidate['overlap_sections'])
+    year = ast.literal_eval(candidate['year'])
+
+    return candidate['desc'], sub_events, candidate['title'], hyperlinks, year, sections
+
+
 def process_mention_data(
         samples,
         tokenizer,
@@ -328,21 +343,21 @@ def process_mention_data(
         ent_start_token=ENT_START_TAG,
         ent_end_token=ENT_END_TAG,
 ):
-    text_file = open('data/wikipedia/wiki/title_text.json', 'r')
-    title_text = json.load(text_file)
-    print('Text loaded.')
-
+    # text_file = open('data/wikipedia/wiki/title_text.json', 'r')
+    # title_text = json.load(text_file)
+    # print('Text loaded.')
+    #
     id2title_file = open('data/wikipedia/wiki/enwiki-20200301.id2t.pkl', 'rb')
     id2title = pickle.load(id2title_file)
     print('ID to title loaded.')
-
-    t2hyperlinks_file = open('data/wikipedia/wiki/t2hyperlinks.json', 'r')
-    t2h = json.load(t2hyperlinks_file)
-    print('HyperLinks loaded.')
-
-    flair.device = torch.device('cuda:1')
-    tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
-    print('Sequence Tagger loaded.')
+    #
+    # t2hyperlinks_file = open('data/wikipedia/wiki/t2hyperlinks.json', 'r')
+    # t2h = json.load(t2hyperlinks_file)
+    # print('HyperLinks loaded.')
+    #
+    # flair.device = torch.device('cuda:0')
+    # tagger = SequenceTagger.load("flair/ner-english-ontonotes-large")
+    # print('Sequence Tagger loaded.')
 
     if silent:
         iter_ = samples
@@ -353,15 +368,16 @@ def process_mention_data(
     all_context_tokens = []
     all_candidate_tokens = []
     all_label_tokens = []
-    backup_data = []
-    for idx, sample in enumerate(iter_):
-        all_candidates = sample[candidates_key]
+    # backup_data = []
+    for idx, m_sample in enumerate(iter_):
+        all_candidates = m_sample['candidates']
+        sample = m_sample['sample']
         gold_id = sample['label_id']
 
         pointer = -1
         for j in range(0, len(all_candidates)):
             if id2title is not None:
-                title = all_candidates[j]
+                title = all_candidates[j]['title']
                 if title.replace(" ", "_") not in id2title[1]:
                     continue
                 predict_id = GetWikiID(id2title, title)
@@ -385,23 +401,23 @@ def process_mention_data(
         ## print("\n\n Context Token", sample_context_token["tokens"],"\n\n")
 
         sample_candidate_tokens = []
-        all_candidates_new_data = []
+        # all_candidates_new_data = []
 
         for candidate in all_candidates:
-            desc, sub_events, title, hyperlinks, year, overlap_sections = getCandidateData(tagger, title=candidate,
-                                                                                           id2title=id2title, t2h=t2h,
-                                                                                           title_text=title_text)
+            desc, sub_events, title, hyperlinks, year, overlap_sections = getCandidateDatafromBackup(candidate)
 
-            candidate_json = {
-                'desc': f"{desc}",
-                'sub_events': f"{sub_events}",
-                'title': f"{title}",
-                'hyperlinks': f"{hyperlinks}",
-                'year': f"{year}",
-                'overlap_sections': f"{overlap_sections}"
-            }
+            # candidate_json = {
+            #     'desc': f"{desc}",
+            #     'sub_events': f"{sub_events}",
+            #     'title': f"{title}",
+            #     'hyperlinks': f"{hyperlinks}",
+            #     'year': f"{year}",
+            #     'overlap_sections': f"{overlap_sections}"
+            # }
 
-            all_candidates_new_data.append(candidate_json)
+            # print(desc,sub_events,title,hyperlinks,year,overlap_sections)
+
+            # all_candidates_new_data.append(candidate_json)
             ## if p == pointer:
             ##    print ("Desc: ",desc," Sub_events: ", sub_events," Title: ", title," Hyp: ", hyperlinks)
             if len(hyperlinks) > 0:
@@ -434,11 +450,11 @@ def process_mention_data(
         all_candidate_tokens.append(sample_candidate_tokens)
         all_label_tokens.append(pointer)
 
-        sample_candidate_data = {
-            'sample': sample,
-            'candidates': all_candidates_new_data
-        }
-        backup_data.append(sample_candidate_data)
+        # sample_candidate_data = {
+        #     'sample': sample,
+        #     'candidates': all_candidates_new_data
+        # }
+        # backup_data.append(sample_candidate_data)
 
     nn_context = torch.LongTensor(all_context_tokens)
     nn_candidates = torch.LongTensor(all_candidate_tokens)
@@ -451,22 +467,22 @@ def process_mention_data(
     }
 
     try:
-        save_data_path = os.path.join("./out/", "new_train_p3.t7")
+        save_data_path = os.path.join("./out/exp5_date_and_sections/train/", "new_train_p4_new.t7")
         torch.save(nn_data, save_data_path)
     except:
-        save_data_path = os.path.join("./out/", "new_train_exp_p3.json")
+        save_data_path = os.path.join("./out/exp5_date_and_sections/train/", "new_train_exp_p4_new.json")
         outfile = open(save_data_path, 'w')
         json.dump(nn_data, outfile)
 
-    try:
-        save_data_path = os.path.join("./out/", "backup_new_train_p3_cand_data.json")
-        outfile = open(save_data_path, 'w')
-        json.dump(backup_data, outfile)
-    except:
-        save_data_path = os.path.join("./out/", "backup_new_train_p3_cand_data.txt")
-        outfile = open(save_data_path, 'w')
-        outfile.write(f'{backup_data}')
-        outfile.close()
+    # try:
+    #     save_data_path = os.path.join("./out/", "backup_new_train_p4_cand_data.json")
+    #     outfile = open(save_data_path, 'w')
+    #     json.dump(backup_data, outfile)
+    # except:
+    #     save_data_path = os.path.join("./out/", "backup_new_train_p4_cand_data.txt")
+    #     outfile = open(save_data_path, 'w')
+    #     outfile.write(f'{backup_data}')
+    #     outfile.close()
 
     return nn_data
 
@@ -487,12 +503,16 @@ if __name__ == "__main__":
     )
 
     train_samples = []
-    with io.open('./out/train_result_dp_top30.json', mode="r", encoding="utf-8") as file:
-        for line in file:
-            train_samples.append(json.loads(line.strip()))
+    # with io.open('./out/exp5_date_and_sections/backup_new_valid_p4_cand_data.json', mode="r", encoding="utf-8") as file:
+    #     for line in file:
+    #         train_samples.append(json.loads(line.strip()))
+
+    text_file = open('./out/exp5_date_and_sections/train/backup_new_train_p4_cand_data.json', 'r')
+    train_samples = json.load(text_file)
+    print('Text loaded.')
 
     print("Length data_to_link", len(train_samples))
-    train_samples = train_samples[30000:45000]
+    # train_samples = train_samples
 
     data = process_mention_data(train_samples, tokenizer, 256, 256, False)
 

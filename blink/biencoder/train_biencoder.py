@@ -36,15 +36,14 @@ from blink.biencoder.zeshel_utils import DOC_PATH, WORLDS, world_to_id
 from blink.common.optimizer import get_bert_optimizer
 from blink.common.params import BlinkParser
 
-
-
 logger = None
+
 
 # The evaluate function during training uses in-batch negatives:
 # for a batch of size B, the labels from the batch are used as label candidates
 # B is controlled by the parameter eval_batch_size
 def evaluate(
-    reranker, eval_dataloader, params, device, logger,
+        reranker, eval_dataloader, params, device, logger,
 ):
     reranker.model.eval()
     if params["silent"]:
@@ -67,7 +66,7 @@ def evaluate(
         logits = logits.detach().cpu().numpy()
         # Using in-batch negatives, the label ids are diagonal
         label_ids = torch.LongTensor(
-                torch.arange(params["eval_batch_size"])
+            torch.arange(params["eval_batch_size"])
         ).numpy()
         tmp_eval_accuracy, _ = utils.accuracy(logits, label_ids)
 
@@ -95,7 +94,6 @@ def get_scheduler(params, optimizer, len_train_data, logger):
     batch_size = params["train_batch_size"]
     grad_acc = params["gradient_accumulation_steps"]
     epochs = params["num_train_epochs"]
-
 
     num_train_steps = int(len_train_data / batch_size / grad_acc) * epochs
     num_warmup_steps = int(num_train_steps * params["warmup_proportion"])
@@ -132,7 +130,7 @@ def main(params):
     # An effective batch size of `x`, when we are accumulating the gradient accross `y` batches will be achieved by having a batch size of `z = x / y`
     # args.gradient_accumulation_steps = args.gradient_accumulation_steps // n_gpu
     params["train_batch_size"] = (
-        params["train_batch_size"] // params["gradient_accumulation_steps"]
+            params["train_batch_size"] // params["gradient_accumulation_steps"]
     )
     train_batch_size = params["train_batch_size"]
     eval_batch_size = params["eval_batch_size"]
@@ -149,6 +147,8 @@ def main(params):
     # Load train data
     train_samples = utils.read_dataset("train", params["data_path"])
     logger.info("Read %d train samples." % len(train_samples))
+
+    train_samples = train_samples[:200]
 
     train_data, train_tensor_data = data.process_mention_data(
         train_samples,
@@ -174,6 +174,7 @@ def main(params):
     valid_samples = utils.read_dataset("valid", params["data_path"])
     logger.info("Read %d valid samples." % len(valid_samples))
 
+    valid_samples = valid_samples[:100]
     valid_data, valid_tensor_data = data.process_mention_data(
         valid_samples,
         tokenizer,
@@ -230,11 +231,11 @@ def main(params):
 
         for step, batch in enumerate(iter_):
             batch = tuple(t.to(device) for t in batch)
-            context_input, candidate_input, _= batch
+            context_input, candidate_input, _ = batch
             loss, _ = reranker(context_input, candidate_input)
 
             if n_gpu > 1:
-                loss = loss.mean() # mean() to average on multi-gpu.
+                loss = loss.mean()  # mean() to average on multi-gpu.
 
             if grad_acc_steps > 1:
                 loss = loss / grad_acc_steps
@@ -297,7 +298,7 @@ def main(params):
     # save the best model in the parent_dir
     logger.info("Best performance in epoch: {}".format(best_epoch_idx))
     params["path_to_model"] = os.path.join(
-        model_output_path, 
+        model_output_path,
         "epoch_{}".format(best_epoch_idx),
         WEIGHTS_NAME,
     )

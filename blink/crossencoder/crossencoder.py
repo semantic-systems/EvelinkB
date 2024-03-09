@@ -24,13 +24,20 @@ from pytorch_transformers.modeling_roberta import (
     RobertaConfig,
     RobertaModel,
 )
+# from pytorch_transformers.modeling_distilbert import (
+#     DistilBertPreTrainedModel,
+#     DistilBertConfig,
+#     DistilBertModel,
+# )
+#
+# from pytorch_transformers.tokenization_distilbert import DistilBertTokenizer
 
 from pytorch_transformers.tokenization_bert import BertTokenizer
 from pytorch_transformers.tokenization_roberta import RobertaTokenizer
 
 from blink.common.ranker_base import BertEncoder, get_model_obj
 from blink.common.optimizer import get_bert_optimizer
-from blink.common.params import ENT_START_TAG, ENT_END_TAG, ENT_TITLE_TAG
+from blink.common.params import ENT_START_TAG, ENT_END_TAG, ENT_TITLE_TAG, ENT_DATE_TAG, TYPE_TAG_MAPPING
 
 
 def load_crossencoder(params):
@@ -57,7 +64,7 @@ class CrossEncoderModule(torch.nn.Module):
         self.config = self.encoder.bert_model.config
 
     def forward(
-        self, token_idx_ctxt, segment_idx_ctxt, mask_ctxt,
+            self, token_idx_ctxt, segment_idx_ctxt, mask_ctxt,
     ):
         embedding_ctxt = self.encoder(token_idx_ctxt, segment_idx_ctxt, mask_ctxt)
         return embedding_ctxt.squeeze(-1)
@@ -73,7 +80,7 @@ class CrossEncoderRanker(torch.nn.Module):
         self.n_gpu = torch.cuda.device_count()
 
         if params.get("roberta"):
-            self.tokenizer = RobertaTokenizer.from_pretrained(params["bert_model"],)
+            self.tokenizer = RobertaTokenizer.from_pretrained(params["bert_model"], )
         else:
             self.tokenizer = BertTokenizer.from_pretrained(
                 params["bert_model"], do_lower_case=params["lowercase"]
@@ -84,13 +91,15 @@ class CrossEncoderRanker(torch.nn.Module):
                 ENT_START_TAG,
                 ENT_END_TAG,
                 ENT_TITLE_TAG,
+                TYPE_TAG_MAPPING['DATE'][0],
+                TYPE_TAG_MAPPING['DATE'][1]
             ],
         }
         self.tokenizer.add_special_tokens(special_tokens_dict)
         self.NULL_IDX = self.tokenizer.pad_token_id
         self.START_TOKEN = self.tokenizer.cls_token
         self.END_TOKEN = self.tokenizer.sep_token
-        
+
         # init model
         self.build_model()
         if params["path_to_model"] is not None:
@@ -114,11 +123,11 @@ class CrossEncoderRanker(torch.nn.Module):
 
     def build_model(self):
         self.model = CrossEncoderModule(self.params, self.tokenizer)
-    
+
     def save_model(self, output_dir):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        model_to_save = get_model_obj(self.model) 
+        model_to_save = get_model_obj(self.model)
         output_model_file = os.path.join(output_dir, WEIGHTS_NAME)
         output_config_file = os.path.join(output_dir, CONFIG_NAME)
         torch.save(model_to_save.state_dict(), output_model_file)
@@ -140,7 +149,7 @@ class CrossEncoderRanker(torch.nn.Module):
             text_vecs, self.NULL_IDX, context_len,
         )
         # print(token_idx_ctxt.size(), segment_idx_ctxt.size(), mask_ctxt.size())
-        embedding_ctxt = self.model(token_idx_ctxt, segment_idx_ctxt, mask_ctxt,)
+        embedding_ctxt = self.model(token_idx_ctxt, segment_idx_ctxt, mask_ctxt, )
         # print(embedding_ctxt.size(), num_cand)
 
         return embedding_ctxt.reshape(-1, num_cand)

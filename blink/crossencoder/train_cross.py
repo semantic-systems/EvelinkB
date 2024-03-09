@@ -179,8 +179,8 @@ def main(params):
             )
         )
 
-    # An effective batch size of `x`, when we are accumulating the gradient accross `y` batches will be achieved by having a batch size of `z = x / y`
-    # args.gradient_accumulation_steps = args.gradient_accumulation_steps // n_gpu
+    # An effective batch size of `x`, when we are accumulating the gradient accross `y` batches will be achieved by
+    # having a batch size of `z = x / y` args.gradient_accumulation_steps = args.gradient_accumulation_steps // n_gpu
     params["train_batch_size"] = (
         params["train_batch_size"] // params["gradient_accumulation_steps"]
     )
@@ -199,7 +199,7 @@ def main(params):
     max_seq_length = params["max_seq_length"]
     context_length = params["max_context_length"]
     
-    fname = os.path.join(params["data_path"], "train.t7")
+    fname = os.path.join(params["data_path"], "new_train.t7")
     train_data = torch.load(fname)
     context_input = train_data["context_vecs"]
     candidate_input = train_data["candidate_vecs"]
@@ -209,9 +209,9 @@ def main(params):
         context_input = context_input[:max_n]
         candidate_input = candidate_input[:max_n]
         label_input = label_input[:max_n]
-        # print(context_input, context_input.size())
-        # print(candidate_input, candidate_input.size())
-        # print(label_input, label_input.size())
+    # print(context_input, context_input.size())
+    # print(candidate_input, candidate_input.size())
+    # print(label_input, label_input.size())
 
     context_input = modify(context_input, candidate_input, max_seq_length)
     print(context_input.size())
@@ -228,7 +228,7 @@ def main(params):
         batch_size=params["train_batch_size"]
     )
 
-    fname = os.path.join(params["data_path"], "valid.t7")
+    fname = os.path.join(params["data_path"], "new_valid.t7")
     valid_data = torch.load(fname)
     context_input = valid_data["context_vecs"]
     candidate_input = valid_data["candidate_vecs"]
@@ -254,15 +254,15 @@ def main(params):
     )
 
     # evaluate before training
-    results = evaluate(
-        reranker,
-        valid_dataloader,
-        device=device,
-        logger=logger,
-        context_length=context_length,
-        zeshel=params["zeshel"],
-        silent=params["silent"],
-    )
+    # results = evaluate(
+    #     reranker,
+    #     valid_dataloader,
+    #     device=device,
+    #     logger=logger,
+    #     context_length=context_length,
+    #     zeshel=params["zeshel"],
+    #     silent=params["silent"],
+    # )
 
     number_of_samples_per_dataset = {}
 
@@ -299,12 +299,6 @@ def main(params):
             iter_ = tqdm(train_dataloader, desc="Batch")
 
         part = 0
-
-        print("sleeping")
-        time.sleep(10)
-        torch.cuda.empty_cache()
-        time.sleep(5)
-        print("Cache emptied")
 
         for step, batch in enumerate(iter_):
             batch = tuple(t.to(device) for t in batch)
