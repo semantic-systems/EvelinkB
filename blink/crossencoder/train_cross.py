@@ -254,19 +254,22 @@ def main(params):
     )
 
     # evaluate before training
-    results = evaluate(
-        reranker,
-        valid_dataloader,
-        device=device,
-        logger=logger,
-        context_length=context_length,
-        zeshel=params["zeshel"],
-        silent=params["silent"],
-    )
+    # results = evaluate(
+    #     reranker,
+    #     valid_dataloader,
+    #     device=device,
+    #     logger=logger,
+    #     context_length=context_length,
+    #     zeshel=params["zeshel"],
+    #     silent=params["silent"],
+    # )
 
     number_of_samples_per_dataset = {}
 
     time_start = time.time()
+
+    print("Refreshing Key")
+    os.system('kinit -R')
 
     utils.write_to_file(
         os.path.join(model_output_path, "training_params.txt"), str(params)
@@ -353,6 +356,8 @@ def main(params):
                 model.train()
                 logger.info("\n")
 
+        print("Refreshing Key")
+        os.system('kinit -R')
         logger.info("***** Saving fine - tuned model *****")
         epoch_output_folder_path = os.path.join(
             model_output_path, "epoch_{}".format(epoch_idx)
@@ -378,6 +383,8 @@ def main(params):
         best_epoch_idx = li[np.argmax(ls)]
         logger.info("\n")
 
+    print("Refreshing Key")
+    os.system('kinit -R')
     execution_time = (time.time() - time_start) / 60
     utils.write_to_file(
         os.path.join(model_output_path, "training_time.txt"),

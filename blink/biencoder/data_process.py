@@ -9,6 +9,7 @@ import logging
 import torch
 from tqdm import tqdm, trange
 from torch.utils.data import DataLoader, TensorDataset
+import textdistance as td
 
 from pytorch_transformers.tokenization_bert import BertTokenizer
 
@@ -24,13 +25,13 @@ def select_field(data, key1, key2=None):
 
 
 def get_context_representation(
-    sample,
-    tokenizer,
-    max_seq_length,
-    mention_key="mention",
-    context_key="context",
-    ent_start_token=ENT_START_TAG,
-    ent_end_token=ENT_END_TAG,
+        sample,
+        tokenizer,
+        max_seq_length,
+        mention_key="mention",
+        context_key="context",
+        ent_start_token=ENT_START_TAG,
+        ent_end_token=ENT_END_TAG,
 ):
     mention_tokens = []
     if sample[mention_key] and len(sample[mention_key]) > 0:
@@ -69,7 +70,7 @@ def get_context_representation(
             left_quota += right_quota - right_add
 
     context_tokens = (
-        context_left[-left_quota:] + mention_tokens + context_right[:right_quota]
+            context_left[-left_quota:] + mention_tokens + context_right[:right_quota]
     )
 
     context_tokens = ["[CLS]"] + context_tokens + entity_tokens + ["[SEP]"]
@@ -97,15 +98,35 @@ def get_context_representation(
     }
 
 
-def get_candidate_representation(
-    candidate_desc, 
-    tokenizer, 
-    max_seq_length, 
-    candidate_title=None,
-    title_tag=ENT_TITLE_TAG,
-    hyperlinks=None
-):
+def search_list(event, unique_events):
+    for u_event in unique_events:
+        # print(event, u_event)
+        # print(td.jaccard(event, u_event))
+        if td.jaccard(event, u_event) > 0.8:
+            # print(event, u_event)
+            return True
+    return False
 
+
+def getUniqueEvents(sub_events):
+    unique_events = []
+    for event in sub_events:
+        if not search_list(event, unique_events):
+            unique_events.append(event)
+    return unique_events
+
+
+def get_candidate_representation(
+        candidate_desc,
+        tokenizer,
+        max_seq_length,
+        sub_events,
+        sub_sections,
+        year,
+        candidate_title=None,
+        title_tag=ENT_TITLE_TAG,
+        hyperlinks=None
+):
     cls_token = tokenizer.cls_token
     sep_token = tokenizer.sep_token
     cand_tokens = tokenizer.tokenize(candidate_desc)
@@ -113,6 +134,13 @@ def get_candidate_representation(
     if candidate_title is not None:
         title_tokens = tokenizer.tokenize(candidate_title)
         title_tokens = title_tokens + [title_tag]
+
+    year_tokens = []
+    # if year is not None:
+    #     year_tokens = tokenizer.tokenize(str(year))
+    #     year_tokens = [TYPE_TAG_MAPPING['DATE'][0]] + year_tokens + [TYPE_TAG_MAPPING['DATE'][1]]
+
+    # print(year_tokens)
 
     link_tokens = []
     # print(hyperlinks)
@@ -125,8 +153,71 @@ def get_candidate_representation(
 
     # print(link_tokens)
 
-    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(link_tokens) - 2]
-    cand_tokens = [cls_token] + title_tokens + cand_tokens + link_tokens + [sep_token]
+    overlap_sections = []
+    for item in sub_events:
+        if item[0] in sub_sections:
+            overlap_sections.append(item[0])
+
+    sub_events_tokens = []
+    if len(overlap_sections) > 0:
+        # print("Overlap Sections:", overlap_sections)
+        if len(overlap_sections) > 6:
+            overlap_sections = overlap_sections[:6]
+            for section in overlap_sections:
+                tokens = tokenizer.tokenize(section)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+        else:
+            for section in overlap_sections:
+                tokens = tokenizer.tokenize(section)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+
+    # print(overlap_sections)
+
+    sub_events_local = []
+
+    for event in sub_events:
+        if event[1] > 0.7:
+            sub_events_local.append(event[0])
+
+    # print(sub_events_local)
+
+    # removing duplicates from sub_events
+    if len(sub_events_local) > 0 and len(overlap_sections) > 0:
+        sub_events_local = list(set(sub_events_local).difference(overlap_sections))
+
+    # print("Before:", sub_events_local)
+    sub_events_local = getUniqueEvents(sub_events_local)
+    # print("After:", sub_events_local)
+
+    if len(sub_events_local) > 0:
+        # print("Sub events:", sub_events)
+        if len(sub_events_local) + len(overlap_sections) > 12:
+            sub_events_local = sub_events_local[0: 12 - len(overlap_sections)]
+            # print("reduce sub events",sub_events)
+            for sub_event in sub_events_local:
+                tokens = tokenizer.tokenize(sub_event)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+        else:
+            for sub_event in sub_events_local:
+                tokens = tokenizer.tokenize(sub_event)
+                tokens = ["[SEP]"] + tokens
+                sub_events_tokens += tokens
+
+    # print(sub_events_tokens)
+
+    cand_tokens = cand_tokens[: max_seq_length - len(title_tokens) - len(year_tokens) - len(link_tokens) - len(
+        sub_events_tokens) - 2]
+    cand_tokens = [cls_token] + title_tokens + year_tokens + cand_tokens + link_tokens + sub_events_tokens + [sep_token]
+
+    # if len(sub_events_local) > 0 and len(overlap_sections) > 0:
+    #     # print("Year: ", year)
+    #     print("overlap_sections", overlap_sections)
+    #     print("sub_events_local", sub_events_local)
+    #     print("sub_events_tokens", sub_events_tokens)
+    #     print("cand_tokens", cand_tokens)
 
     # print(cand_tokens)
 
@@ -147,20 +238,19 @@ def get_candidate_representation(
 
 
 def process_mention_data(
-    samples,
-    tokenizer,
-    max_context_length,
-    max_cand_length,
-    silent,
-    mention_key="mention",
-    context_key="context",
-    label_key="label",
-    title_key='label_title',
-    ent_start_token=ENT_START_TAG,
-    ent_end_token=ENT_END_TAG,
-    title_token=ENT_TITLE_TAG,
-    debug=False,
-    logger=None,
+        samples,
+        tokenizer,
+        max_context_length,
+        max_cand_length,
+        silent,
+        mention_key="mention",
+        context_key="context",
+        label_key="label",
+        title_key='label_title',
+        ent_start_token=ENT_START_TAG,
+        ent_end_token=ENT_END_TAG,
+        debug=False,
+        logger=None,
 ):
     processed_samples = []
 
@@ -188,13 +278,19 @@ def process_mention_data(
         label = sample[label_key]
         title = sample.get(title_key, None)
         if 'hyperlinks' in sample:
-            label_tokens = get_candidate_representation(
-                label, tokenizer, max_cand_length, title, hyperlinks=sample['hyperlinks']
-            )
+            label_tokens = get_candidate_representation(label, tokenizer, max_cand_length, [],
+                                                        [], [], title,
+                                                        hyperlinks=sample['hyperlinks'])
+            # label_tokens = get_candidate_representation(label, tokenizer, max_cand_length, sample['sub_events'],
+            #                                             sample['sub_sections'], sample['year'], title,
+            #                                             hyperlinks=sample['hyperlinks'])
         else:
             label_tokens = get_candidate_representation(
-                label, tokenizer, max_cand_length, title
+                label, tokenizer, max_cand_length, [], [], [], title
             )
+            # label_tokens = get_candidate_representation(
+            #     label, tokenizer, max_cand_length, sample['sub_events'], sample['sub_sections'], sample['year'], title
+            # )
         label_idx = int(sample["label_id"])
 
         record = {

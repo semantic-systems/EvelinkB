@@ -45,19 +45,19 @@ def _print_colorful_text(input_sentence, samples):
     init()  # colorful output
     msg = ""
     if samples and (len(samples) > 0):
-        msg += input_sentence[0 : int(samples[0]["start_pos"])]
+        msg += input_sentence[0: int(samples[0]["start_pos"])]
         for idx, sample in enumerate(samples):
             msg += colored(
-                input_sentence[int(sample["start_pos"]) : int(sample["end_pos"])],
+                input_sentence[int(sample["start_pos"]): int(sample["end_pos"])],
                 "grey",
                 HIGHLIGHTS[idx % len(HIGHLIGHTS)],
             )
             if idx < len(samples) - 1:
                 msg += input_sentence[
-                    int(sample["end_pos"]) : int(samples[idx + 1]["start_pos"])
-                ]
+                       int(sample["end_pos"]): int(samples[idx + 1]["start_pos"])
+                       ]
             else:
-                msg += input_sentence[int(sample["end_pos"]) :]
+                msg += input_sentence[int(sample["end_pos"]):]
     else:
         msg = input_sentence
         print("Failed to identify entity from text:")
@@ -65,7 +65,7 @@ def _print_colorful_text(input_sentence, samples):
 
 
 def _print_colorful_prediction(
-    idx, sample, e_id, e_title, e_text, e_url, show_url=False
+        idx, sample, e_id, e_title, e_text, e_url, show_url=False
 ):
     print(colored(sample["mention"], "grey", HIGHLIGHTS[idx % len(HIGHLIGHTS)]))
     to_print = "id:{}\ntitle:{}\ntext:{}\n".format(e_id, e_title, e_text[:256])
@@ -85,11 +85,11 @@ def _annotate(ner_model, input_sentences):
         record["label_id"] = -1
         # LOWERCASE EVERYTHING !
         record["context_left"] = sentences[mention["sent_idx"]][
-            : mention["start_pos"]
-        ].lower()
+                                 : mention["start_pos"]
+                                 ].lower()
         record["context_right"] = sentences[mention["sent_idx"]][
-            mention["end_pos"] :
-        ].lower()
+                                  mention["end_pos"]:
+                                  ].lower()
         record["mention"] = mention["text"].lower()
         record["start_pos"] = int(mention["start_pos"])
         record["end_pos"] = int(mention["end_pos"])
@@ -99,7 +99,7 @@ def _annotate(ner_model, input_sentences):
 
 
 def _load_candidates(
-    entity_catalogue, entity_encoding, faiss_index=None, index_path=None, logger=None
+        entity_catalogue, entity_encoding, faiss_index=None, index_path=None, logger=None
 ):
     # only load candidate encoding if not using faiss index
     if faiss_index is None:
@@ -213,7 +213,7 @@ def __load_test(test_filename, kb2id, wikipedia_id2local_id, logger):
 
 
 def _get_test_samples(
-    test_filename, test_entities_path, title2id, wikipedia_id2local_id, logger
+        test_filename, test_entities_path, title2id, wikipedia_id2local_id, logger
 ):
     kb2id = None
     if test_entities_path:
@@ -239,7 +239,8 @@ def _process_biencoder_dataloader(samples, tokenizer, biencoder_params):
     return dataloader
 
 
-def _run_biencoder(biencoder, dataloader, candidate_encoding, top_k=100, indexer=None, device='cpu', cand_pool_path=None, id2title=None, save_topk_result=False):
+def _run_biencoder(biencoder, dataloader, candidate_encoding, top_k=100, indexer=None, device='cpu',
+                   cand_pool_path=None, id2title=None, save_topk_result=False):
     biencoder.model.eval()
     biencoder.to(device)
     labels = []
@@ -339,7 +340,6 @@ def _run_crossencoder(crossencoder, dataloader, logger, context_len, device="cud
 
 
 def load_models(args, logger=None):
-
     # load biencoder model
     if logger:
         logger.info("loading biencoder model")
@@ -373,7 +373,7 @@ def load_models(args, logger=None):
         args.entity_catalogue,
         args.entity_encoding,
         faiss_index=getattr(args, 'faiss_index', None),
-        index_path=getattr(args, 'index_path' , None),
+        index_path=getattr(args, 'index_path', None),
         logger=logger,
     )
 
@@ -392,21 +392,21 @@ def load_models(args, logger=None):
 
 
 def run(
-    args,
-    logger,
-    biencoder,
-    biencoder_params,
-    crossencoder,
-    crossencoder_params,
-    candidate_encoding,
-    title2id,
-    id2title,
-    id2text,
-    wikipedia_id2local_id,
-    faiss_indexer=None,
-    test_data=None,
-    device='cpu',
-    alternate_mapping=None
+        args,
+        logger,
+        biencoder,
+        biencoder_params,
+        crossencoder,
+        crossencoder_params,
+        candidate_encoding,
+        title2id,
+        id2title,
+        id2text,
+        wikipedia_id2local_id,
+        faiss_indexer=None,
+        test_data=None,
+        device='cpu',
+        alternate_mapping=None
 ):
     if not test_data and not args.test_mentions and not args.interactive:
         msg = (
@@ -427,6 +427,9 @@ def run(
         id2title = alternate_mapping[0]
         id2text = alternate_mapping[1]
         id2hyper = alternate_mapping[2]
+        id2subevent = alternate_mapping[3]
+        id2subsection = alternate_mapping[4]
+        id2date = alternate_mapping[5]
 
     stopping_condition = False
     while not stopping_condition:
@@ -488,7 +491,8 @@ def run(
         print("run biencoder")
         top_k = args.top_k
         labels, nns, scores, nn_data = _run_biencoder(
-            biencoder, dataloader, candidate_encoding, top_k, faiss_indexer, device, cand_pool_path=args.candidate_pool, id2title=id2title, save_topk_result=args.save_topk_result
+            biencoder, dataloader, candidate_encoding, top_k, faiss_indexer, device, cand_pool_path=args.candidate_pool,
+            id2title=id2title, save_topk_result=args.save_topk_result
         )
 
         if args.save_topk_result:
@@ -544,12 +548,12 @@ def run(
                 )
         # prepare crossencoder data
         context_input, candidate_input, label_input = prepare_crossencoder_data(
-            crossencoder.tokenizer, samples, labels, nns, id2title, id2text, id2hyper, keep_all=True, args=crossencoder_params
+            crossencoder.tokenizer, samples, labels, nns, id2title, id2text, id2hyper, id2subevent, id2subsection,
+            id2date, keep_all=True, args=crossencoder_params
         )
         context_input = modify(
             context_input, candidate_input, crossencoder_params["max_seq_length"]
         )
-
 
         dataloader = _process_crossencoder_dataloader(
             context_input, label_input, crossencoder_params
@@ -585,7 +589,7 @@ def run(
             scores = []
             predictions = []
             for entity_list, index_list, scores_list in zip(
-                nns, index_array, unsorted_scores
+                    nns, index_array, unsorted_scores
             ):
 
                 index_list = index_list.tolist()
@@ -614,7 +618,7 @@ def run(
 
                 if len(samples) > 0:
                     overall_unormalized_accuracy = (
-                        crossencoder_normalized_accuracy * len(label_input) / len(samples)
+                            crossencoder_normalized_accuracy * len(label_input) / len(samples)
                     )
                 print(
                     "overall unnormalized accuracy: %.4f" % overall_unormalized_accuracy
