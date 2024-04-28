@@ -13,17 +13,15 @@ import blink.biencoder.data_process as data
 from blink.common.params import ENT_START_TAG, ENT_END_TAG
 
 
-
 def prepare_crossencoder_mentions(
-    tokenizer,
-    samples,
-    max_context_length=256,
-    mention_key="mention",
-    context_key="context",
-    ent_start_token=ENT_START_TAG,
-    ent_end_token=ENT_END_TAG,
+        tokenizer,
+        samples,
+        max_context_length=256,
+        mention_key="mention",
+        context_key="context",
+        ent_start_token=ENT_START_TAG,
+        ent_end_token=ENT_END_TAG,
 ):
-
     context_input_list = []  # samples X 128
 
     for sample in tqdm(samples):
@@ -44,9 +42,9 @@ def prepare_crossencoder_mentions(
 
 
 def prepare_crossencoder_candidates(
-    tokenizer, labels, nns, id2title, id2text, id2hyper, max_cand_length=256, topk=200
+        tokenizer, labels, nns, id2title, id2text, id2hyper, id2subevent, id2subsection, id2date, max_cand_length=256,
+        topk=200
 ):
-
     START_TOKEN = tokenizer.cls_token
     END_TOKEN = tokenizer.sep_token
 
@@ -62,11 +60,28 @@ def prepare_crossencoder_candidates(
             if label == candidate_id:
                 label_id = jdx
             # print(id2text.keys())
+            sub_events = []
+            sub_section = []
+            year = None
+
+            # if f'{candidate_id}' in id2subevent:
+            #     sub_events = id2subevent[f'{candidate_id}']
+            # if f'{candidate_id}' in id2subsection:
+            #     sub_section = id2subsection[f'{candidate_id}']
+            # if f'{candidate_id}' in id2date:
+            #     year = id2date[f'{candidate_id}']
+
+            # print(candidate_id, type(candidate_id))
+            # print(sub_events, sub_section, year)
+
             if candidate_id in id2hyper:
                 rep = data.get_candidate_representation(
                     id2text[candidate_id],
                     tokenizer,
                     max_cand_length,
+                    sub_events,
+                    sub_section,
+                    year,
                     id2title[candidate_id],
                     hyperlinks=id2hyper[candidate_id]
                 )
@@ -75,6 +90,9 @@ def prepare_crossencoder_candidates(
                     id2text[candidate_id],
                     tokenizer,
                     max_cand_length,
+                    sub_events,
+                    sub_section,
+                    year,
                     id2title[candidate_id],
                     hyperlinks=None
                 )
@@ -86,6 +104,7 @@ def prepare_crossencoder_candidates(
         candidate_input_list.append(candidates)
 
         idx += 1
+        # print(f"{idx}/{len(labels)}")
         sys.stdout.write("{}/{} \r".format(idx, len(labels)))
         sys.stdout.flush()
 
@@ -96,7 +115,7 @@ def prepare_crossencoder_candidates(
 
 
 def filter_crossencoder_tensor_input(
-    context_input_list, label_input_list, candidate_input_list
+        context_input_list, label_input_list, candidate_input_list
 ):
     # remove the - 1 : examples for which gold is not among the candidates
     context_input_list_filtered = [
@@ -122,15 +141,17 @@ def filter_crossencoder_tensor_input(
 
 
 def prepare_crossencoder_data(
-    tokenizer, samples, labels, nns, id2title, id2text, id2hyper, keep_all=False, args=None
+        tokenizer, samples, labels, nns, id2title, id2text, id2hyper, id2subevent, id2subsection, id2date,
+        keep_all=False, args=None
 ):
-
     # encode mentions
-    context_input_list = prepare_crossencoder_mentions(tokenizer, samples, max_context_length=args["max_context_length"])
+    context_input_list = prepare_crossencoder_mentions(tokenizer, samples,
+                                                       max_context_length=args["max_context_length"])
 
     # encode candidates (output of biencoder)
     label_input_list, candidate_input_list = prepare_crossencoder_candidates(
-        tokenizer, labels, nns, id2title, id2text, id2hyper, max_cand_length=args["max_cand_length"]
+        tokenizer, labels, nns, id2title, id2text, id2hyper, id2subevent, id2subsection, id2date,
+        max_cand_length=args["max_cand_length"]
     )
 
     if not keep_all:

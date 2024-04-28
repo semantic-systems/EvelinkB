@@ -15,6 +15,7 @@ import random
 import time
 import numpy as np
 
+
 from multiprocessing.pool import ThreadPool
 
 from tqdm import tqdm, trange
@@ -139,15 +140,21 @@ def main(params):
 
     # Fix the random seeds
     seed = params["seed"]
+    print(f"Seed is {seed}")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if reranker.n_gpu > 0:
         torch.cuda.manual_seed_all(seed)
 
+    print("Refreshing Key")
+    os.system('kinit -R')
+
     # Load train data
     train_samples = utils.read_dataset("train", params["data_path"])
     logger.info("Read %d train samples." % len(train_samples))
+
+    # train_samples = train_samples[:100]
 
     train_data, train_tensor_data = data.process_mention_data(
         train_samples,
@@ -173,6 +180,8 @@ def main(params):
     valid_samples = utils.read_dataset("valid", params["data_path"])
     logger.info("Read %d valid samples." % len(valid_samples))
 
+    # valid_samples = valid_samples[:100]
+
     valid_data, valid_tensor_data = data.process_mention_data(
         valid_samples,
         tokenizer,
@@ -189,9 +198,9 @@ def main(params):
     )
 
     # evaluate before training
-    results = evaluate(
-        reranker, valid_dataloader, params, device=device, logger=logger,
-    )
+    # results = evaluate(
+    #     reranker, valid_dataloader, params, device=device, logger=logger,
+    # )
 
     number_of_samples_per_dataset = {}
 
@@ -267,6 +276,8 @@ def main(params):
                 model.train()
                 logger.info("\n")
 
+        print("Refreshing Key")
+        os.system('kinit -R')
         logger.info("***** Saving fine - tuned model *****")
         epoch_output_folder_path = os.path.join(
             model_output_path, "epoch_{}".format(epoch_idx)
@@ -285,6 +296,8 @@ def main(params):
         best_epoch_idx = li[np.argmax(ls)]
         logger.info("\n")
 
+    print("Refreshing Key")
+    os.system('kinit -R')
     execution_time = (time.time() - time_start) / 60
     utils.write_to_file(
         os.path.join(model_output_path, "training_time.txt"),

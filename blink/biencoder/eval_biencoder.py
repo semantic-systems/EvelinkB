@@ -39,12 +39,27 @@ def load_entity_dict(logger, params, is_zeshel):
 
     with open(path, 'r') as f:
         title_text = json.load(f)
+        print('Text loaded.')
 
         id2title_file = open('data/wikipedia/wiki/enwiki-20200301.id2t.pkl', 'rb')
         id2title = pickle.load(id2title_file)
+        print('Title loaded.')
 
         t2hyperlinks_file = open('data/wikipedia/wiki/t2hyperlinks.json', 'r')
         t2h = json.load(t2hyperlinks_file)
+        print('Hyperlinks loaded.')
+
+        t2sub_events_file = open('data/wikipedia/extra/extra_sub_events.json', 'r')
+        t2sub_events = json.load(t2sub_events_file)
+        print('Sub Events loaded.')
+
+        t2sub_sections_file = open('data/wikipedia/extra/extra_sub_sections.json', 'r')
+        t2sub_sections = json.load(t2sub_sections_file)
+        print('Sub Sections loaded.')
+
+        t2date_file = open('data/wikipedia/extra/extra_date.json', 'r')
+        t2date = json.load(t2date_file)
+        print('Dates loaded.')
 
         for event in title_text:
             event_form = event
@@ -61,7 +76,19 @@ def load_entity_dict(logger, params, is_zeshel):
                     hyperlinks.append((title, title_text[event_form.replace("_", ' ')][link['start']: link['end']]))
 
             text = title_text[event].strip()
-            entity_list.append((event, text[0:2000], hyperlinks))
+            sub_events = []
+            if event_form.replace(" ", '_') in id2title[1] and id2title[1][event_form.replace(" ", '_')] in t2sub_events:
+                sub_events = t2sub_events[id2title[1][event_form.replace(" ", '_')]]
+
+            sub_sections = []
+            if event_form.replace(" ", '_') in id2title[1] and id2title[1][event_form.replace(" ", '_')] in t2sub_sections:
+                sub_sections = t2sub_sections[id2title[1][event_form.replace(" ", '_')]]
+
+            year = None
+            if event_form.replace(" ", '_') in id2title[1] and id2title[1][event_form.replace(" ", '_')] in t2date:
+                year = t2date[id2title[1][event_form.replace(" ", '_')]]
+
+            entity_list.append((event, text[0:2000], hyperlinks, sub_events, sub_sections, year))
             if params["debug"] and len(entity_list) > 200000:
                 break
 
@@ -70,10 +97,10 @@ def load_entity_dict(logger, params, is_zeshel):
 
 # zeshel version of get candidate_pool_tensor
 def get_candidate_pool_tensor_zeshel(
-    entity_dict,
-    tokenizer,
-    max_seq_length,
-    logger,
+        entity_dict,
+        tokenizer,
+        max_seq_length,
+        logger,
 ):
     candidate_pool = {}
     for src in range(len(WORLDS)):
@@ -91,11 +118,11 @@ def get_candidate_pool_tensor_zeshel(
 
 
 def get_candidate_pool_tensor_helper(
-    entity_desc_list,
-    tokenizer,
-    max_seq_length,
-    logger,
-    is_zeshel,
+        entity_desc_list,
+        tokenizer,
+        max_seq_length,
+        logger,
+        is_zeshel,
 ):
     if is_zeshel:
         return get_candidate_pool_tensor_zeshel(
@@ -114,41 +141,44 @@ def get_candidate_pool_tensor_helper(
 
 
 def get_candidate_pool_tensor(
-    entity_desc_list,
-    tokenizer,
-    max_seq_length,
-    logger,
+        entity_desc_list,
+        tokenizer,
+        max_seq_length,
+        logger,
 ):
     # TODO: add multiple thread process
     logger.info("Convert candidate text to id")
-    cand_pool = [] 
+    cand_pool = []
     for entity_desc in tqdm(entity_desc_list):
         if type(entity_desc) is tuple:
-            title, entity_text, hyperlinks = entity_desc
+            title, entity_text, hyperlinks, sub_events, sub_sections, year = entity_desc
         else:
             title = None
             entity_text = entity_desc
 
         rep = data.get_candidate_representation(
-                entity_text, 
-                tokenizer, 
-                max_seq_length,
-                title,
-                hyperlinks=hyperlinks
+            entity_text,
+            tokenizer,
+            max_seq_length,
+            sub_events,
+            sub_sections,
+            year,
+            title,
+            hyperlinks=hyperlinks
         )
         cand_pool.append(rep["ids"])
 
-    cand_pool = torch.LongTensor(cand_pool) 
+    cand_pool = torch.LongTensor(cand_pool)
     return cand_pool
 
 
 def encode_candidate(
-    reranker,
-    candidate_pool,
-    encode_batch_size,
-    silent,
-    logger,
-    is_zeshel,
+        reranker,
+        candidate_pool,
+        encode_batch_size,
+        silent,
+        logger,
+        is_zeshel,
 ):
     if is_zeshel:
         src = 0
@@ -165,7 +195,7 @@ def encode_candidate(
             )
             cand_encode_dict[src] = cand_pool_encode
         return cand_encode_dict
-        
+
     reranker.model.eval()
     device = reranker.device
     sampler = SequentialSampler(candidate_pool)
@@ -191,10 +221,10 @@ def encode_candidate(
 
 
 def load_or_generate_candidate_pool(
-    tokenizer,
-    params,
-    logger,
-    cand_pool_path,
+        tokenizer,
+        params,
+        logger,
+        cand_pool_path,
 ):
     candidate_pool = None
     is_zeshel = params.get("zeshel", None)
@@ -234,7 +264,7 @@ def main(params):
     reranker = BiEncoderRanker(params)
     tokenizer = reranker.tokenizer
     model = reranker.model
-    
+
     device = reranker.device
 
     cand_encode_path = params.get("cand_encode_path", None)
@@ -268,7 +298,7 @@ def main(params):
             silent=params["silent"],
             logger=logger,
             is_zeshel=params.get("zeshel", None)
-            
+
         )
 
         # if cand_encode_path is not None:
